@@ -1,0 +1,15 @@
+https://onlinedocs.microchip.com/oxy/GUID-CF2C0DBC-087A-4CE7-B9C1-5E08A928CFD9-en-US-6/GUID-B7E7C275-7879-4EDD-9C93-D5DCB8C3013A.html
+
+switched to Quad NOR gate to replace NAND
+
+**Figure out "output"
+
+-Current setup:
+	MOSFET:
+	-Gate: wire from NOR gate output, and 5V button
+	-Drain: schematic
+	-Source: Ground
+	NOR Gate:
+	-Input: None-floating
+	-Output: MOSFET gate
+	
