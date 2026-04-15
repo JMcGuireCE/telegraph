@@ -1,18 +1,18 @@
 // Relay firmware — MCU bridges two isolated open-drain bus segments
 
-const int LEFT_IN = 4;   // sense left bus (HIGH = idle, LOW = active)
-const int LEFT_OUT = 16;  // drive left N-MOS gate (HIGH = pull bus LOW)
-const int RIGHT_IN = 17;  // sense right bus
-const int RIGHT_OUT = 18;  // drive right N-MOS gate
-const int LED_GREEN_LR = 25;
-const int LED_GREEN_RL = 26;
-const int LED_RED = 27;
+const int LEFT_IN = 13;   // sense left bus (HIGH = idle, LOW = active)
+const int LEFT_OUT = 12;  // drive left N-MOS gate (HIGH = pull bus LOW)
+const int RIGHT_IN = 14;  // sense right bus
+const int RIGHT_OUT = 27;  // drive right N-MOS gate
+const int LED_GREEN_LR = 4;
+const int LED_GREEN_RL = 2;
+const int LED_RED =15;
 
 enum State { IDLE, FORWARD_LR, FORWARD_RL, COLLISION };
 State state = IDLE;
 
 unsigned long collisionUntil = 0;
-const unsigned long LATCH_MS = 500;
+const unsigned long LATCH_MS = 50;
 
 void setup() {
   Serial.begin(115200);
@@ -24,8 +24,8 @@ void setup() {
   pinMode(LED_GREEN_RL, OUTPUT);
   pinMode(LED_RED, OUTPUT);
 
-  digitalWrite(LEFT_OUT,  LOW);   // don't drive either bus
-  digitalWrite(RIGHT_OUT, LOW);
+  digitalWrite(LEFT_OUT,  HIGH);   // don't drive either bus
+  digitalWrite(RIGHT_OUT, HIGH);
   Serial.println("Relay ready");
 }
 
@@ -39,18 +39,18 @@ void loop() {
       if (l && r) {
         state = COLLISION;
         collisionUntil = millis() + LATCH_MS;
-        digitalWrite(LEFT_OUT,  LOW);
-        digitalWrite(RIGHT_OUT, LOW);
+        digitalWrite(LEFT_OUT,  HIGH);
+        digitalWrite(RIGHT_OUT, HIGH);
         digitalWrite(LED_RED, HIGH);
 
       } else if (l) {
         state = FORWARD_LR;
-        digitalWrite(RIGHT_OUT, HIGH);    // mirror left onto right
+        digitalWrite(RIGHT_OUT, LOW);    // mirror left onto right
         digitalWrite(LED_GREEN_LR, HIGH);
 
       } else if (r) {
         state = FORWARD_RL;
-        digitalWrite(LEFT_OUT, HIGH);     // mirror right onto left
+        digitalWrite(LEFT_OUT, LOW);     // mirror right onto left
         digitalWrite(LED_GREEN_RL, HIGH);
       }
       break;
@@ -60,41 +60,35 @@ void loop() {
         // far side started keying too
         state = COLLISION;
         collisionUntil = millis() + LATCH_MS;
-        digitalWrite(RIGHT_OUT, LOW);
+        digitalWrite(RIGHT_OUT, HIGH);
         digitalWrite(LED_GREEN_LR, LOW);
         digitalWrite(LED_RED, HIGH);
 
       } else if (l) {
-        digitalWrite(RIGHT_OUT, HIGH);    // keep mirroring
+        digitalWrite(RIGHT_OUT, LOW);    // keep mirroring
 
       } else {
-        digitalWrite(RIGHT_OUT, LOW);     // key released, stop
+        digitalWrite(RIGHT_OUT, HIGH);     // key released, stop
         digitalWrite(LED_GREEN_LR, LOW);
         state = IDLE;
       }
       break;
 
     case FORWARD_RL:
-      if (l) {
-        state = COLLISION;
-        collisionUntil = millis() + LATCH_MS;
+    if (r) {
         digitalWrite(LEFT_OUT, LOW);
-        digitalWrite(LED_GREEN_RL, LOW);
-        digitalWrite(LED_RED, HIGH);
-
-      } else if (r) {
-        digitalWrite(LEFT_OUT, HIGH);
         
       } else {
-        digitalWrite(LEFT_OUT, LOW);
+        digitalWrite(LEFT_OUT, HIGH);
         digitalWrite(LED_GREEN_RL, LOW);
         state = IDLE;
       }
       break;
 
     case COLLISION:
-      digitalWrite(LEFT_OUT,  LOW);
-      digitalWrite(RIGHT_OUT, LOW);
+      digitalWrite(LEFT_OUT,  HIGH);
+      digitalWrite(RIGHT_OUT, HIGH);
+      digitalWrite(LED_RED, HIGH);
       if (millis() >= collisionUntil && !l && !r) {
         digitalWrite(LED_RED, LOW);
         state = IDLE;
