@@ -15,7 +15,6 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT);
 
   pinMode(TX_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
 
   Serial.print("Initializing LEDC...");
   ledcAttach(SPEAKER_PIN, LEDC_SAMPLE_RATE, LEDC_PRECISION);
@@ -30,8 +29,11 @@ void loop() {
   rx = digitalRead(RX_PIN);
 
   digitalWrite(TX_PIN, button);
-  digitalWrite(LED_PIN, button);
   speakerEnable(button || rx);
+  Serial.print("Button...");
+  Serial.println(button);
+  Serial.print("RX...");
+  Serial.println(rx);
 }
 
 
