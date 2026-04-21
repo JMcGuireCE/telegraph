@@ -9,6 +9,9 @@
 #define BUTTON_PIN  16
 #define SPEAKER_PIN 17
 
+#define LED2        2
+
+  
 #define LEDC_PRECISION 8
 #define LEDC_SAMPLE_RATE 1000
 #define LEDC_DUTY 128
