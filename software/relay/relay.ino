@@ -1,98 +1,75 @@
-// Relay firmware — MCU bridges two isolated open-drain bus segments
+// ============================================================
+//  Morse Code Open-Drain Relay — Nucleo-G474RE (Arduino/STM32duino)
+//
+//  Flow:
+//    IC2 signal → detected on IC2_IN → relayed via IC1_OUT
+//    IC1 signal → detected on IC1_IN → relayed via IC2_OUT
+// ============================================================
 
-const int LEFT_IN = 13;   // sense left bus (HIGH = idle, LOW = active)
-const int LEFT_OUT = 12;  // drive left N-MOS gate (HIGH = pull bus LOW)
-const int RIGHT_IN = 14;  // sense right bus
-const int RIGHT_OUT = 27;  // drive right N-MOS gate
-const int LED_GREEN_LR = 4;
-const int LED_GREEN_RL = 2;
-const int LED_RED =15;
+// --- Pin Definitions (Arduino header labels) -----------------
+const int IC1_IN  = A0;   // PA0 — reads  IC1 bus
+const int IC1_OUT = A5;   // PA1 — drives IC1 bus LOW
+const int IC2_IN  = A2;   // PA4 — reads  IC2 bus
+const int IC2_OUT = A3;   // PB0 — drives IC2 bus LOW
 
-enum State { IDLE, FORWARD_LR, FORWARD_RL, COLLISION };
-State state = IDLE;
+// --- Bail timeout (ms) ---------------------------------------
+const unsigned long BAIL_MS = 700;
 
-unsigned long collisionUntil = 0;
-const unsigned long LATCH_MS = 50;
+// --- Open-drain helpers --------------------------------------
+inline void busAssert (int pin) { digitalWrite(pin, LOW);  }
+inline void busRelease(int pin) { digitalWrite(pin, HIGH); }
 
+// --- Monitor and relay ---------------------------------------
+void checkAndRelay(int inPin, int outPin, const char *label) {
+  if (digitalRead(inPin) == HIGH) return;
+
+  unsigned long t0 = millis();
+
+  while (digitalRead(inPin) == LOW) {
+    if (millis() - t0 > BAIL_MS) {
+      Serial.print("[BAIL] ");
+      Serial.print(label);
+      Serial.println(" — pulse too long, ignoring.");
+      return;
+    }
+  }
+
+  unsigned long duration = millis() - t0;
+
+  Serial.print("[RELAY] ");
+  Serial.print(label);
+  Serial.print(" — ");
+  Serial.print(duration);
+  Serial.println(" ms");
+
+  busAssert(outPin);
+  delay(duration);
+  busRelease(outPin);
+}
+
+// --- Setup ---------------------------------------------------
 void setup() {
   Serial.begin(115200);
-  pinMode(LEFT_IN, INPUT);
-  pinMode(RIGHT_IN, INPUT);
-  pinMode(LEFT_OUT, OUTPUT);
-  pinMode(RIGHT_OUT, OUTPUT);
-  pinMode(LED_GREEN_LR, OUTPUT);
-  pinMode(LED_GREEN_RL, OUTPUT);
-  pinMode(LED_RED, OUTPUT);
+  delay(1000);
 
-  digitalWrite(LEFT_OUT,  HIGH);   // don't drive either bus
-  digitalWrite(RIGHT_OUT, HIGH);
-  Serial.println("Relay ready");
+  pinMode(IC1_IN,  INPUT_PULLUP);
+  pinMode(IC2_IN,  INPUT_PULLUP);
+  pinMode(IC1_OUT, OUTPUT);
+  pinMode(IC2_OUT, OUTPUT);
+  busRelease(IC1_OUT);
+  busRelease(IC2_OUT);
+
+  Serial.println("\r\n============================================");
+  Serial.println(" Morse Relay ready — Nucleo-G474RE / Arduino");
+  Serial.println("  IC1_IN=A0  IC1_OUT=A1");
+  Serial.println("  IC2_IN=A2  IC2_OUT=A3");
+  Serial.println("============================================\r\n");
 }
 
 void loop() {
-  bool l = (digitalRead(LEFT_IN)  == LOW);  // LOW = someone keying
-  bool r = (digitalRead(RIGHT_IN) == LOW);
+  bool ic1Low = (digitalRead(IC1_IN) == LOW);
+  bool ic2Low = (digitalRead(IC2_IN) == LOW);
 
-  switch (state) {
-
-    case IDLE:
-      if (l && r) {
-        state = COLLISION;
-        collisionUntil = millis() + LATCH_MS;
-        digitalWrite(LEFT_OUT,  HIGH);
-        digitalWrite(RIGHT_OUT, HIGH);
-        digitalWrite(LED_RED, HIGH);
-
-      } else if (l) {
-        state = FORWARD_LR;
-        digitalWrite(RIGHT_OUT, LOW);    // mirror left onto right
-        digitalWrite(LED_GREEN_LR, HIGH);
-
-      } else if (r) {
-        state = FORWARD_RL;
-        digitalWrite(LEFT_OUT, LOW);     // mirror right onto left
-        digitalWrite(LED_GREEN_RL, HIGH);
-      }
-      break;
-
-    case FORWARD_LR:
-      if (r) {
-        // far side started keying too
-        state = COLLISION;
-        collisionUntil = millis() + LATCH_MS;
-        digitalWrite(RIGHT_OUT, HIGH);
-        digitalWrite(LED_GREEN_LR, LOW);
-        digitalWrite(LED_RED, HIGH);
-
-      } else if (l) {
-        digitalWrite(RIGHT_OUT, LOW);    // keep mirroring
-
-      } else {
-        digitalWrite(RIGHT_OUT, HIGH);     // key released, stop
-        digitalWrite(LED_GREEN_LR, LOW);
-        state = IDLE;
-      }
-      break;
-
-    case FORWARD_RL:
-    if (r) {
-        digitalWrite(LEFT_OUT, LOW);
-        
-      } else {
-        digitalWrite(LEFT_OUT, HIGH);
-        digitalWrite(LED_GREEN_RL, LOW);
-        state = IDLE;
-      }
-      break;
-
-    case COLLISION:
-      digitalWrite(LEFT_OUT,  HIGH);
-      digitalWrite(RIGHT_OUT, HIGH);
-      digitalWrite(LED_RED, HIGH);
-      if (millis() >= collisionUntil && !l && !r) {
-        digitalWrite(LED_RED, LOW);
-        state = IDLE;
-      }
-      break;
-  }
+  if (ic1Low) checkAndRelay(IC1_IN, IC2_OUT, "IC1→IC2");
+  if (ic2Low) checkAndRelay(IC2_IN, IC1_OUT, "IC2→IC1");
 }
